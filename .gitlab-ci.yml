@@ -1,0 +1,4 @@
+say_hello:
+  image: alpine:latest
+  script:
+    - echo 'Hello World'
