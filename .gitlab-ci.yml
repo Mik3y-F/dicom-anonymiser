@@ -1,3 +1,9 @@
+image: golang:1.15
+
+stages:
+  - build
+  - test
+
 say_hello:
   image: alpine:latest
   script:
