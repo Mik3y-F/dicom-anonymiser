@@ -5,9 +5,9 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"ioutil"
+	"io/ioutil"
 
-	"gitlab.com/medical-research/dicom-deidentifier/dicom"
+	dicom "gitlab.com/medical-research/dicom-deidentifier"
 	healthcare "google.golang.org/api/healthcare/v1"
 )
 
@@ -27,7 +27,7 @@ type Service struct {
 }
 
 // StoreDICOMImageInstances uploads DICOM instances to the gcloud healthcare api
-func (s *Service) StoreDICOMImageInstances(df []*dicom.ImageFile) error {
+func (s *Service) StoreMultipleDICOMImageInstances(df []*dicom.ImageFile) error {
 	for _, image := range df {
 		err := s.StoreDICOMImageInstance(image.Path)
 		if err != nil {
@@ -76,3 +76,5 @@ func (s *Service) StoreDICOMImageInstance(dicomFile string) error {
 	fmt.Fprintf(s.LogOutput, "%s", respBytes)
 	return nil
 }
+
+// TODO: Remember to Handle possible case of a Race Condition
