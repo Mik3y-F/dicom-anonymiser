@@ -8,7 +8,7 @@ type ImageFile struct {
 
 // Service is an impentable interface with various operations that can be performed on DICOM Images
 type Service interface {
-	StoreDICOMImageInstances(df []*ImageFile) error
+	StoreMultipleDICOMImageInstances(df []*ImageFile) error
 	StoreDICOMImageInstance(df *ImageFile) error
 	AnonymiseDICOMS(df []*ImageFile) error
 	PurgeDICOMS() error
