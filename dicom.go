@@ -1,15 +1,17 @@
-package dicom
+package dicomdeidentifier
 
-// ImageFile represents a single instance of a DICOM Image
-type ImageFile struct {
+import "context"
+
+// Dicom represents a single instance of a DICOM Image
+type Dicom struct {
 	Name string
 	Path string
 }
 
-// Service is an impentable interface with various operations that can be performed on DICOM Images
-type Service interface {
-	StoreMultipleDICOMImageInstances(df []*ImageFile) error
-	StoreDICOMImageInstance(df *ImageFile) error
-	AnonymiseDICOMS(df []*ImageFile) error
-	PurgeDICOMS() error
+// DicomService is an impentable interface with various operations that can be performed on DICOM Images
+type DicomService interface {
+
+	// Creates and stores dicom instances in the cloud for further cloud operations
+	// The dicom instances will be stored in special storage abstractions known as dicom stores
+	CreateDicomInstances(ctx context.Context, dicomStore DicomStore, dicoms ...Dicom) error
 }
