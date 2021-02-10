@@ -3,14 +3,13 @@ package http
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 
-	"path"
-	"strings"
 	"time"
 
-	dicomdeidentifier "gitlab.com/medical-research/dicom-deidentifier"
+	dcmd "gitlab.com/medical-research/dicom-deidentifier"
 
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
@@ -36,7 +35,7 @@ var (
 const ShutdownTimeout = 1 * time.Second
 
 // Server represents an HTTP server. It is meant to wrap all HTTP functionality
-// used by the application so that dependent packages (such as cmd/wtfd) do not
+// used by the application so that dependent packages (such as cmd/dicomd) do not
 // need to reference the "net/http" package at all.
 type Server struct {
 	ln     net.Listener
@@ -49,8 +48,10 @@ type Server struct {
 	Domain string
 
 	// Servics used by the various HTTP routes.
-	DicomStoreService dicomdeidentifier.DicomStoreService
-	DicomService      dicomdeidentifier.DicomService
+	DicomStoreService dcmd.DicomStoreService
+	DicomService      dcmd.DicomService
+
+	CloudStorageService dcmd.CloudStorageService
 }
 
 // NewServer returns a new instance of Server.
@@ -64,7 +65,7 @@ func NewServer() *Server {
 	// Report panics to external service.
 	s.router.Use(reportPanic)
 
-	// Our router is wrapped by another function handler to perform some
+	// The router is wrapped by another function handler to perform some
 	// middleware-like tasks that cannot be performed by actual middleware.
 	// This includes changing route paths for JSON endpoints & overridding methods.
 	s.server.Handler = http.HandlerFunc(s.serveHTTP)
@@ -73,8 +74,9 @@ func NewServer() *Server {
 	router := s.router.PathPrefix("/").Subrouter()
 	router.Use(trackMetrics)
 
-	// Handle authentication check within handler function for dicom deidntification endpoint.
-	router.HandleFunc("/deidentify_dicoms", s.handleDeidentifyDicoms).Methods("POST")
+	// Authenticated Routes
+	router.HandleFunc("/get_presigned_url", s.handleGetPresignedBucketURL).Methods("POST")
+	router.HandleFunc("/send_upload_status", s.handleSendUploadStatus).Methods("POST")
 
 	return s
 }
@@ -133,7 +135,7 @@ func (s *Server) Open() (err error) {
 	// Begin serving requests on the listener. We use Serve() instead of
 	// ListenAndServe() because it allows us to check for listen errors (such
 	// as trying to use an already open port) synchronously.
-	go s.server.Serve(s.ln)
+	go log.Fatal(s.server.Serve(s.ln))
 
 	return nil
 }
@@ -152,20 +154,6 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		case http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodDelete:
 			r.Method = v
 		}
-	}
-
-	// Override content-type for certain extensions.
-	// This allows us to easily cURL API endpoints with a ".json" or ".csv"
-	// extension instead of having to explicitly set Content-type & Accept headers.
-	// The extensions are removed so they don't appear in the routes.
-	switch ext := path.Ext(r.URL.Path); ext {
-	case ".json":
-		r.Header.Set("Accept", "application/json")
-		r.Header.Set("Content-type", "application/json")
-		r.URL.Path = strings.TrimSuffix(r.URL.Path, ext)
-	case ".csv":
-		r.Header.Set("Accept", "text/csv")
-		r.URL.Path = strings.TrimSuffix(r.URL.Path, ext)
 	}
 
 	// Delegate remaining HTTP handling to the gorilla router.
@@ -206,7 +194,7 @@ func reportPanic(next http.Handler) http.Handler {
 		defer func() {
 			if err := recover(); err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				dicomdeidentifier.ReportPanic(err)
+				dcmd.ReportPanic(err)
 			}
 		}()
 
@@ -214,27 +202,29 @@ func reportPanic(next http.Handler) http.Handler {
 	})
 }
 
-// handleIndex handles the "POST /deidentify_dicom" route. It displays a dashboard with the
-// user's dials, recently updated membership values, & a chart.
-func (s *Server) handleDeidentifyDicoms(w http.ResponseWriter, r *http.Request) {
-	// TODO: Unzip Uploaded zip file
-	// TODO: Create Two DicomStores (Source & Destination)
-	// TODO: Create DicomInstances in the Source Dicom store
-	// TODO: Deidentify Dicoms in the Source Dicom Store
-	// TODO: Retreive the Deidentified Dicom instances stored in the Destination Store
-	// TODO: Upload the Deidentified Dicom zip file to another server
+// handleGetPresignedBucketURL handles the "POST /get_presigned_url" route.
+func (s *Server) handleGetPresignedBucketURL(w http.ResponseWriter, r *http.Request) {
+	// TODO: GetStorageBucketName (ENVAR)
+	// TODO: Get object name from request
+	// TODO: Get serviceAccount from env (ENVAR)
+	// TODO: Set HTTP method as Post by default
+
+	// u, err := s.CloudStorageService.GeneratePresignedBucketURL()
+	// if err != nil {
+	// 	Error(w, r, err)
+	// 	return
+	// }
+	// json.NewEncoder(w).Encode(u)
 }
 
-// handleVersion displays the deployed version.
-func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/plain")
-	w.Write([]byte(dicomdeidentifier.Version))
-}
-
-// handleVersion displays the deployed commit.
-func (s *Server) handleCommit(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/plain")
-	w.Write([]byte(dicomdeidentifier.Commit))
+// handleSendUploadStatus handles the "POST /send_upload_status" route.
+func (s *Server) handleSendUploadStatus(w http.ResponseWriter, r *http.Request) {
+	// TODO: GetUploadStatus from frontend
+	// TODO: If successful kickstart export from Bucket to DICOM Store
+	// TODO: Begin anonymisation
+	// TODO: Export Anonymised DICOMS to Bucket
+	// TODO: Send report to client(frontend)
+	// TODO: Send presigned link to the patient record system
 }
 
 // ListenAndServeTLSRedirect runs an HTTP server on port 80 to redirect users
