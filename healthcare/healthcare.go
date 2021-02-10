@@ -16,7 +16,6 @@ const (
 
 // DicomAPI represents a healthcare implementation of dicom.DicomService
 type DicomAPI struct {
-	ctx               context.Context
 	HealthcareService *healthcare.Service
 	StoreService      *healthcare.ProjectsLocationsDatasetsDicomStoresService
 }

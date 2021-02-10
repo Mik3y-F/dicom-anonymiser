@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	dicomdeidentifier "gitlab.com/medical-research/dicom-deidentifier"
+	dcmd "gitlab.com/medical-research/dicom-deidentifier"
 )
 
 // Ensure service implements interface.
-var _ dicomdeidentifier.DicomService = (*DicomService)(nil)
+var _ dcmd.DicomService = (*DicomService)(nil)
 
 // DicomService represents a service for managing Dicoms
 type DicomService struct {
@@ -25,7 +25,7 @@ func NewDicomService(dicomAPI *DicomAPI) *DicomService {
 }
 
 // CreateDicomInstances creates dicom instances in the cloud within special abstractions called dicomStores
-func (s *DicomService) CreateDicomInstances(ctx context.Context, dicomStore dicomdeidentifier.DicomStore, dicoms ...dicomdeidentifier.Dicom) error {
+func (s *DicomService) CreateDicomInstances(ctx context.Context, dicomStore dcmd.DicomStore, dicoms ...dcmd.Dicom) error {
 
 	for _, dicom := range dicoms {
 		dicomData, err := ioutil.ReadFile(dicom.Path)
@@ -53,7 +53,6 @@ func (s *DicomService) CreateDicomInstances(ctx context.Context, dicomStore dico
 			return fmt.Errorf("StoreInstances: status %d %s: %s", resp.StatusCode, resp.Status, respBytes)
 		}
 		fmt.Printf("%s", respBytes)
-		return nil
 	}
 
 	return nil
