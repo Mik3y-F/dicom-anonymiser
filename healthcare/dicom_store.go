@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	dicomdeidentifier "gitlab.com/medical-research/dicom-deidentifier"
+	dcmd "gitlab.com/medical-research/dicom-deidentifier"
 	"google.golang.org/api/healthcare/v1"
 )
 
 // Ensure service implements interface.
-var _ dicomdeidentifier.DicomStoreService = (*DicomStoreService)(nil)
+var _ dcmd.DicomStoreService = (*DicomStoreService)(nil)
 
 // DicomStoreService represents a service for managing DicomStores
 type DicomStoreService struct {
@@ -26,7 +26,7 @@ func NewDicomStoreService(dicomAPI *DicomAPI) *DicomStoreService {
 
 // CreateDicomStore creates special storage abstractions in the cloud known as dicom stores
 // The dicom stores will hold the various dicom instances created
-func (s *DicomStoreService) CreateDicomStore(ctx context.Context, dicomStoreID string) (*dicomdeidentifier.DicomStore, error) {
+func (s *DicomStoreService) CreateDicomStore(ctx context.Context, dicomStoreID string) (*dcmd.DicomStore, error) {
 
 	store := &healthcare.DicomStore{}
 	parent := fmt.Sprintf("projects/%s/locations/%s/datasets/%s", projectID, location, datasetID)
@@ -58,7 +58,7 @@ func (s *DicomStoreService) GenerateDicomStoreID(ctx context.Context) (string, e
 }
 
 // GetDicomStoreList retreives a list of all dicom stores created
-func (s *DicomStoreService) GetDicomStoreList(ctx context.Context) ([]*dicomdeidentifier.DicomStore, error) {
+func (s *DicomStoreService) GetDicomStoreList(ctx context.Context) ([]*dcmd.DicomStore, error) {
 
 	parent := fmt.Sprintf("projects/%s/locations/%s/datasets/%s", projectID, location, datasetID)
 
@@ -67,10 +67,10 @@ func (s *DicomStoreService) GetDicomStoreList(ctx context.Context) ([]*dicomdeid
 		return nil, fmt.Errorf("List: %v", err)
 	}
 
-	dicomStores := []*dicomdeidentifier.DicomStore{}
+	dicomStores := []*dcmd.DicomStore{}
 
 	for _, s := range resp.DicomStores {
-		d := dicomdeidentifier.DicomStore{
+		d := dcmd.DicomStore{
 			StoreID: s.Name,
 		}
 		dicomStores = append(dicomStores, &d)
@@ -80,7 +80,7 @@ func (s *DicomStoreService) GetDicomStoreList(ctx context.Context) ([]*dicomdeid
 
 // DeidentifyDicomStore Strips the P.I.I(Personally Identifiable Information) embedded in the dicom instances
 // Deidentified dicom instances will be stored in the destinationDicomStoreProvided
-func (s *DicomStoreService) DeidentifyDicomStore(ctx context.Context, sourceDicomStore, destinationDicomStore *dicomdeidentifier.DicomStore) error {
+func (s *DicomStoreService) DeidentifyDicomStore(ctx context.Context, sourceDicomStore, destinationDicomStore *dcmd.DicomStore) error {
 
 	datasetsService := s.DicomAPI.HealthcareService.Projects.Locations.Datasets
 

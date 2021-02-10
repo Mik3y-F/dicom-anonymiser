@@ -32,7 +32,7 @@ func NewClient(u string) *Client {
 	return &Client{URL: u}
 }
 
-// newRequest returns a new HTTP request but adds the current user's API key
+// newRequest returns a new HTTP request
 // and sets the accept & content type headers to use JSON.
 func (c *Client) newRequest(ctx context.Context, method, url string, body io.Reader) (*http.Request, error) {
 	// Build new request with base URL.
@@ -67,7 +67,10 @@ func Error(w http.ResponseWriter, r *http.Request, err error) {
 	case "application/json":
 		w.Header().Set("Content-type", "application/json")
 		w.WriteHeader(ErrorStatusCode(code))
-		json.NewEncoder(w).Encode(&ErrorResponse{Error: message})
+		err = json.NewEncoder(w).Encode(&ErrorResponse{Error: message})
+		if err != nil {
+			LogError(r, err)
+		}
 	}
 }
 
