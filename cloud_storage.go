@@ -2,12 +2,12 @@ package dicomdeidentifier
 
 // StorageObject represents a single instance of a cloud storage object
 type CloudStorageObject struct {
-	Name      string          `json:"name"`
-	SignedURL SignedBucketURL `json:"signedURL"`
+	Name string `json:"object-name"`
 }
 
 type SignedBucketURL struct {
-	URL string `json:"url"`
+	URL    string `json:"url,omitempty"`
+	Status string `json:"status,omitempty"`
 }
 
 // CloudStorageBucket represents a single instance of a cloud storage bucket
@@ -19,5 +19,5 @@ type CloudStorageBucket struct {
 type CloudStorageService interface {
 
 	// Generates a presigned bucket URL with limited possible operations for a limited period of time
-	GeneratePresignedBucketURL(bucket *CloudStorageBucket, object *CloudStorageObject, serviceAccount, method string) (*SignedBucketURL, error)
+	GeneratePresignedBucketURL(bucket *CloudStorageBucket, object *CloudStorageObject, method string) (*SignedBucketURL, error)
 }

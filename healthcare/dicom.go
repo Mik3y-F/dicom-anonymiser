@@ -14,11 +14,11 @@ var _ dcmd.DicomService = (*DicomService)(nil)
 
 // DicomService represents a service for managing Dicoms
 type DicomService struct {
-	dicomAPI *DicomAPI
+	dicomAPI *GoogleDicomAPI
 }
 
 // NewDicomService returns a new instance of DicomService
-func NewDicomService(dicomAPI *DicomAPI) *DicomService {
+func NewDicomService(dicomAPI *GoogleDicomAPI) *DicomService {
 	return &DicomService{
 		dicomAPI: dicomAPI,
 	}
@@ -32,8 +32,7 @@ func (s *DicomService) CreateDicomInstances(ctx context.Context, dicomStore dcmd
 		if err != nil {
 			return fmt.Errorf("ReadFile: %v", err)
 		}
-
-		parent := fmt.Sprintf("projects/%s/locations/%s/datasets/%s/dicomStores/%s", projectID, location, datasetID, dicomStore.StoreID)
+		parent := fmt.Sprintf("%s/dicomStores/%s", s.dicomAPI.Dataset.Name, dicomStore.StoreID)
 		dicomWebPath := "studies"
 
 		call := s.dicomAPI.StoreService.StoreInstances(parent, dicomWebPath, bytes.NewReader(dicomData))

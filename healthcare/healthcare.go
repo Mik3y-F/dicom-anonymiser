@@ -4,24 +4,32 @@ import (
 	"context"
 	"fmt"
 
+	dcmd "gitlab.com/medical-research/dicom-deidentifier"
 	"google.golang.org/api/healthcare/v1"
 )
 
 // constants and defaults
 const (
-	projectID = "GCLOUD_PROJECT_ID"
-	location  = "GCLOUD_PROJECT_LOCATION"
-	datasetID = "GCLOUD_PROJECT_DATASET_ID"
+	ProjectID = "GCP_PROJECT"
+	Location  = "GCLOUD_PROJECT_LOCATION"
+	DatasetID = "GCLOUD_PROJECT_DATASET_ID"
 )
 
-// DicomAPI represents a healthcare implementation of dicom.DicomService
-type DicomAPI struct {
+// GoogleDicomAPI represents a healthcare implementation of dicom.DicomService
+type GoogleDicomAPI struct {
 	HealthcareService *healthcare.Service
 	StoreService      *healthcare.ProjectsLocationsDatasetsDicomStoresService
+	Dataset           *healthcare.Dataset
 }
 
 // NewDicomAPI returns a new instance of DicomAPI
-func NewDicomAPI(ctx context.Context) (*DicomAPI, error) {
+func NewDicomAPI(ctx context.Context) (*GoogleDicomAPI, error) {
+
+	p := dcmd.MustGetEnvVar(ProjectID)
+	l := dcmd.MustGetEnvVar(Location)
+	d := dcmd.MustGetEnvVar(DatasetID)
+
+	datasetName := fmt.Sprintf("projects/%s/locations/%s/datasets/%s", p, l, d)
 
 	healthcareService, err := healthcare.NewService(ctx)
 	if err != nil {
@@ -30,9 +38,13 @@ func NewDicomAPI(ctx context.Context) (*DicomAPI, error) {
 
 	dicomStoreService := healthcareService.Projects.Locations.Datasets.DicomStores
 
-	dicomAPI := &DicomAPI{
+	dicomAPI := &GoogleDicomAPI{
 		HealthcareService: healthcareService,
 		StoreService:      dicomStoreService,
+
+		Dataset: &healthcare.Dataset{
+			Name: datasetName,
+		},
 	}
 	return dicomAPI, nil
 }
