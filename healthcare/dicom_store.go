@@ -14,13 +14,13 @@ var _ dcmd.DicomStoreService = (*DicomStoreService)(nil)
 
 // DicomStoreService represents a service for managing DicomStores
 type DicomStoreService struct {
-	DicomAPI *DicomAPI
+	GoogleDicomAPI *GoogleDicomAPI
 }
 
 // NewDicomStoreService returns a new instance of DicomStoreService
-func NewDicomStoreService(dicomAPI *DicomAPI) *DicomStoreService {
+func NewDicomStoreService(dicomAPI *GoogleDicomAPI) *DicomStoreService {
 	return &DicomStoreService{
-		DicomAPI: dicomAPI,
+		GoogleDicomAPI: dicomAPI,
 	}
 }
 
@@ -29,9 +29,9 @@ func NewDicomStoreService(dicomAPI *DicomAPI) *DicomStoreService {
 func (s *DicomStoreService) CreateDicomStore(ctx context.Context, dicomStoreID string) (*dcmd.DicomStore, error) {
 
 	store := &healthcare.DicomStore{}
-	parent := fmt.Sprintf("projects/%s/locations/%s/datasets/%s", projectID, location, datasetID)
+	parent := s.GoogleDicomAPI.Dataset.Name
 
-	resp, err := s.DicomAPI.StoreService.Create(parent, store).DicomStoreId(dicomStoreID).Do()
+	resp, err := s.GoogleDicomAPI.StoreService.Create(parent, store).DicomStoreId(dicomStoreID).Do()
 	if err != nil {
 		return nil, fmt.Errorf("Create: %v", err)
 	}
@@ -43,8 +43,8 @@ func (s *DicomStoreService) CreateDicomStore(ctx context.Context, dicomStoreID s
 // DeleteDicomStore Deletes an existing dicom store
 func (s *DicomStoreService) DeleteDicomStore(ctx context.Context, dicomStoreID string) error {
 
-	name := fmt.Sprintf("projects/%s/locations/%s/datasets/%s/dicomStores/%s", projectID, location, datasetID, dicomStoreID)
-	if _, err := s.DicomAPI.StoreService.Delete(name).Do(); err != nil {
+	name := fmt.Sprintf("%s/dicomStores/%s", s.GoogleDicomAPI.Dataset.Name, dicomStoreID)
+	if _, err := s.GoogleDicomAPI.StoreService.Delete(name).Do(); err != nil {
 		return fmt.Errorf("Delete: %v", err)
 	}
 
@@ -60,9 +60,9 @@ func (s *DicomStoreService) GenerateDicomStoreID(ctx context.Context) (string, e
 // GetDicomStoreList retreives a list of all dicom stores created
 func (s *DicomStoreService) GetDicomStoreList(ctx context.Context) ([]*dcmd.DicomStore, error) {
 
-	parent := fmt.Sprintf("projects/%s/locations/%s/datasets/%s", projectID, location, datasetID)
+	parent := s.GoogleDicomAPI.Dataset.Name
 
-	resp, err := s.DicomAPI.StoreService.List(parent).Do()
+	resp, err := s.GoogleDicomAPI.StoreService.List(parent).Do()
 	if err != nil {
 		return nil, fmt.Errorf("List: %v", err)
 	}
@@ -82,33 +82,28 @@ func (s *DicomStoreService) GetDicomStoreList(ctx context.Context) ([]*dcmd.Dico
 // Deidentified dicom instances will be stored in the destinationDicomStoreProvided
 func (s *DicomStoreService) DeidentifyDicomStore(ctx context.Context, sourceDicomStore, destinationDicomStore *dcmd.DicomStore) error {
 
-	datasetsService := s.DicomAPI.HealthcareService.Projects.Locations.Datasets
+	datasetsService := s.GoogleDicomAPI.HealthcareService.Projects.Locations.Datasets.DicomStores
 
-	parent := fmt.Sprintf("projects/%s/locations/%s", projectID, location)
-
-	req := &healthcare.DeidentifyDatasetRequest{
-		DestinationDataset: fmt.Sprintf("%s/datasets/%s", parent, destinationDicomStore.StoreID),
+	req := &healthcare.DeidentifyDicomStoreRequest{
+		DestinationStore: fmt.Sprintf("%s/dicomStores/%s", s.GoogleDicomAPI.Dataset.Name, destinationDicomStore.StoreID),
 		Config: &healthcare.DeidentifyConfig{
 			Dicom: &healthcare.DicomConfig{
-				KeepList: &healthcare.TagFilterList{
-					Tags: []string{},
-				},
 				FilterProfile: "MINIMAL_KEEP_LIST_PROFILE",
 			},
 			Image: &healthcare.ImageConfig{
-				TextRedactionMode: "REDUCT_SENSITIVE_TEXT",
+				TextRedactionMode: "REDACT_SENSITIVE_TEXT",
 			},
 		},
 	}
 
-	sourceName := fmt.Sprintf("%s/datasets/%s", parent, sourceDicomStore.StoreID)
+	sourceName := fmt.Sprintf("%s/dicomStores/%s", s.GoogleDicomAPI.Dataset.Name, sourceDicomStore.StoreID)
 	resp, err := datasetsService.Deidentify(sourceName, req).Do()
 	if err != nil {
 		return fmt.Errorf("Deidentify: %v", err)
 	}
 
 	// Wait for the deidentification operation to finish.
-	operationService := s.DicomAPI.HealthcareService.Projects.Locations.Datasets.Operations
+	operationService := s.GoogleDicomAPI.HealthcareService.Projects.Locations.Datasets.Operations
 	for {
 		op, err := operationService.Get(resp.Name).Do()
 		if err != nil {

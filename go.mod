@@ -5,7 +5,7 @@ go 1.15
 require (
 	cloud.google.com/go v0.74.0 // indirect
 	cloud.google.com/go/storage v1.10.0
-	github.com/BurntSushi/toml v0.3.1
+	github.com/gorilla/handlers v1.5.1
 	github.com/gorilla/mux v1.8.0
 	github.com/prometheus/client_golang v1.9.0
 	github.com/rollbar/rollbar-go v1.2.0

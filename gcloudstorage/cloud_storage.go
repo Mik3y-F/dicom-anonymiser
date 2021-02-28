@@ -15,19 +15,20 @@ var _ dcmd.CloudStorageService = (*CloudStorageService)(nil)
 
 // CloudStorageService represents a service for managing CloudStorages
 type CloudStorageService struct {
-	CloudStorage *CloudStorage
+	GCloudStorage *GCloudStorage
 }
 
 // NewCloudStorageService returns a new instance of CloudStorageService
-func NewCloudStorageService(cloudStorage *CloudStorage) *CloudStorageService {
+func NewCloudStorageService(gcloudStorage *GCloudStorage) *CloudStorageService {
 	return &CloudStorageService{
-		CloudStorage: cloudStorage,
+		GCloudStorage: gcloudStorage,
 	}
 }
 
 //GeneratePresignedBucketURL Generates a presigned bucket URL with limited possible operations for a limited period of time
-func (s *CloudStorageService) GeneratePresignedBucketURL(bucket *dcmd.CloudStorageBucket, object *dcmd.CloudStorageObject, serviceAccount, method string) (*dcmd.SignedBucketURL, error) {
+func (s *CloudStorageService) GeneratePresignedBucketURL(bucket *dcmd.CloudStorageBucket, object *dcmd.CloudStorageObject, method string) (*dcmd.SignedBucketURL, error) {
 
+	serviceAccount := dcmd.MustGetEnvVar(ServiceAccount)
 	jsonKey, err := ioutil.ReadFile(serviceAccount)
 	if err != nil {
 		return nil, fmt.Errorf("ioutil.ReadFile: %v", err)
@@ -46,7 +47,7 @@ func (s *CloudStorageService) GeneratePresignedBucketURL(bucket *dcmd.CloudStora
 		PrivateKey:     conf.PrivateKey,
 		Expires:        time.Now().Add(15 * time.Minute),
 	}
-	u, err := storage.SignedURL(bucket.Name, object.Name, opts)
+	u, err := s.GCloudStorage.SignedURL(bucket.Name, object.Name, opts)
 	if err != nil {
 		return nil, fmt.Errorf("storage.SignedURL: %v", err)
 	}
