@@ -1,25 +1,46 @@
 package http
 
 import (
+	"compress/gzip"
 	"context"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"os"
 
 	"time"
 
 	dcmd "gitlab.com/medical-research/dicom-deidentifier"
 
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/crypto/acme/autocert"
 )
 
-// Generic HTTP metrics.
+const (
+	Port              = "PORT"
+	StorageBucketName = "STORAGE_BUCKET_NAME"
+)
+
 var (
+	allowedHeaders = []string{
+		"Authorization", "Accept", "Accept-Charset", "Accept-Language",
+		"Accept-Encoding", "Origin", "Host", "User-Agent", "Content-Length",
+		"Content-Type",
+	}
+
+	// allowedOrigins is list of CORS origins allowed to interact with
+	// this service
+	allowedOrigins = []string{
+		"http://localhost:5000",
+	}
+
+	// prometheus monitoring values for generic HTTP Metrics
 	requestCount = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "dicom_deidentifier_http_request_count",
 		Help: "Total number of requests by route",
@@ -41,6 +62,9 @@ type Server struct {
 	ln     net.Listener
 	server *http.Server
 	router *mux.Router
+
+	// websocket
+	WebSocketUpgrader *websocket.Upgrader
 
 	// Bind address & domain for the server's listener.
 	// If domain is specified, server is run on TLS using acme/autocert.
@@ -65,10 +89,23 @@ func NewServer() *Server {
 	// Report panics to external service.
 	s.router.Use(reportPanic)
 
-	// The router is wrapped by another function handler to perform some
-	// middleware-like tasks that cannot be performed by actual middleware.
-	// This includes changing route paths for JSON endpoints & overridding methods.
-	s.server.Handler = http.HandlerFunc(s.serveHTTP)
+	// web socket configs
+	s.WebSocketUpgrader = &websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+	}
+
+	h := handlers.CompressHandlerLevel(s.router, gzip.BestCompression)
+	h = handlers.CORS(
+		handlers.AllowedHeaders(allowedHeaders),
+		handlers.AllowedOrigins(allowedOrigins),
+		handlers.AllowCredentials(),
+		handlers.AllowedMethods([]string{"OPTIONS", "GET", "POST"}),
+	)(h)
+	h = handlers.CombinedLoggingHandler(os.Stdout, h)
+	h = handlers.ContentTypeHandler(h, "application/json")
+
+	s.server.Handler = h
 
 	// Setup a base router that excludes asset handling.
 	router := s.router.PathPrefix("/").Subrouter()
@@ -76,7 +113,8 @@ func NewServer() *Server {
 
 	// Authenticated Routes
 	router.HandleFunc("/get_presigned_url", s.handleGetPresignedBucketURL).Methods("POST")
-	router.HandleFunc("/send_upload_status", s.handleSendUploadStatus).Methods("POST")
+	router.HandleFunc("/start_anonymisation", s.handleStartAnonymisation).Methods("POST")
+	router.HandleFunc("/ws-start-deidentification", s.wsStartDeidentification)
 
 	return s
 }
@@ -127,16 +165,19 @@ func (s *Server) Open() (err error) {
 	if s.Domain != "" {
 		s.ln = autocert.NewListener(s.Domain)
 	} else {
+
 		if s.ln, err = net.Listen("tcp", s.Addr); err != nil {
-			return err
+			return fmt.Errorf("could not initialise listener: %v", err)
 		}
+
 	}
 
 	// Begin serving requests on the listener. We use Serve() instead of
 	// ListenAndServe() because it allows us to check for listen errors (such
 	// as trying to use an already open port) synchronously.
-	go log.Fatal(s.server.Serve(s.ln))
-
+	go func() {
+		log.Fatal(s.server.Serve(s.ln))
+	}()
 	return nil
 }
 
@@ -145,19 +186,6 @@ func (s *Server) Close() error {
 	ctx, cancel := context.WithTimeout(context.Background(), ShutdownTimeout)
 	defer cancel()
 	return s.server.Shutdown(ctx)
-}
-
-func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
-	// Override method for forms passing "_method" value.
-	if r.Method == http.MethodPost {
-		switch v := r.PostFormValue("_method"); v {
-		case http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodDelete:
-			r.Method = v
-		}
-	}
-
-	// Delegate remaining HTTP handling to the gorilla router.
-	s.router.ServeHTTP(w, r)
 }
 
 // trackMetrics is middleware for tracking the request count and timing per route.
@@ -202,31 +230,6 @@ func reportPanic(next http.Handler) http.Handler {
 	})
 }
 
-// handleGetPresignedBucketURL handles the "POST /get_presigned_url" route.
-func (s *Server) handleGetPresignedBucketURL(w http.ResponseWriter, r *http.Request) {
-	// TODO: GetStorageBucketName (ENVAR)
-	// TODO: Get object name from request
-	// TODO: Get serviceAccount from env (ENVAR)
-	// TODO: Set HTTP method as Post by default
-
-	// u, err := s.CloudStorageService.GeneratePresignedBucketURL()
-	// if err != nil {
-	// 	Error(w, r, err)
-	// 	return
-	// }
-	// json.NewEncoder(w).Encode(u)
-}
-
-// handleSendUploadStatus handles the "POST /send_upload_status" route.
-func (s *Server) handleSendUploadStatus(w http.ResponseWriter, r *http.Request) {
-	// TODO: GetUploadStatus from frontend
-	// TODO: If successful kickstart export from Bucket to DICOM Store
-	// TODO: Begin anonymisation
-	// TODO: Export Anonymised DICOMS to Bucket
-	// TODO: Send report to client(frontend)
-	// TODO: Send presigned link to the patient record system
-}
-
 // ListenAndServeTLSRedirect runs an HTTP server on port 80 to redirect users
 // to the TLS-enabled port 443 server.
 func ListenAndServeTLSRedirect(domain string) error {
@@ -239,5 +242,6 @@ func ListenAndServeTLSRedirect(domain string) error {
 func ListenAndServeDebug() error {
 	h := http.NewServeMux()
 	h.Handle("/metrics", promhttp.Handler())
-	return http.ListenAndServe(":6060", h)
+	port := dcmd.MustGetEnvVar(Port)
+	return http.ListenAndServe(":"+port, h)
 }

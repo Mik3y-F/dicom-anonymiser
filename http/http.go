@@ -1,9 +1,8 @@
 package http
 
 import (
-	"context"
 	"encoding/json"
-	"io"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -34,19 +33,19 @@ func NewClient(u string) *Client {
 
 // newRequest returns a new HTTP request
 // and sets the accept & content type headers to use JSON.
-func (c *Client) newRequest(ctx context.Context, method, url string, body io.Reader) (*http.Request, error) {
-	// Build new request with base URL.
-	req, err := http.NewRequest(method, c.URL+url, body)
-	if err != nil {
-		return nil, err
-	}
+// func (c *Client) newRequest(ctx context.Context, method, url string, body io.Reader) (*http.Request, error) {
+// 	// Build new request with base URL.
+// 	req, err := http.NewRequest(method, c.URL+url, body)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	// Default to JSON format.
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Content-type", "application/json")
+// 	// Default to JSON format.
+// 	req.Header.Set("Accept", "application/json")
+// 	req.Header.Set("Content-type", "application/json")
 
-	return req, nil
-}
+// 	return req, nil
+// }
 
 // Error prints & optionally logs an error message.
 func Error(w http.ResponseWriter, r *http.Request, err error) {
@@ -134,4 +133,27 @@ func FromErrorStatusCode(code int) string {
 		}
 	}
 	return dicomdeidentifier.EINTERNAL
+}
+
+// WriteJSONResponse writes the content supplied via the `source` parameter to
+// the supplied http ResponseWriter. The response is returned with the indicated
+// status.
+func WriteJSONResponse(w http.ResponseWriter, source interface{}, status int) {
+	w.WriteHeader(status) // must come first...otherwise the first call to Write... sets an implicit 200
+	content, errMap := json.Marshal(source)
+	if errMap != nil {
+		msg := fmt.Sprintf("error when marshalling %#v to JSON bytes: %#v", source, errMap)
+		http.Error(w, msg, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_, errMap = w.Write(content)
+	if errMap != nil {
+		msg := fmt.Sprintf(
+			"error when writing JSON %s to http.ResponseWriter: %#v", string(content), errMap)
+		http.Error(w, msg, http.StatusInternalServerError)
+		return
+	}
+
 }

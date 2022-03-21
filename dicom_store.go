@@ -27,4 +27,9 @@ type DicomStoreService interface {
 	// Strips the P.I.I(Personally Identifiable Information) embedded in the dicom instances
 	// Deidentified dicom instances will be stored in the destinationDicomStoreProvided
 	DeidentifyDicomStore(ctx context.Context, sourceDicomStore, destinationDicomStore *DicomStore) error
+
+	// Imports Dicom Instances from GCS
+	ImportDICOMInstance(dicomStoreID, contentURI string) error
+	// Exports Dicom Instances to GCS
+	ExportDICOMInstance(dicomStoreID, gcsDestination string) error
 }
