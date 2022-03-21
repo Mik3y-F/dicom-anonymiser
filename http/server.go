@@ -15,6 +15,7 @@ import (
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -62,6 +63,9 @@ type Server struct {
 	server *http.Server
 	router *mux.Router
 
+	// websocket
+	WebSocketUpgrader *websocket.Upgrader
+
 	// Bind address & domain for the server's listener.
 	// If domain is specified, server is run on TLS using acme/autocert.
 	Addr   string
@@ -85,6 +89,12 @@ func NewServer() *Server {
 	// Report panics to external service.
 	s.router.Use(reportPanic)
 
+	// web socket configs
+	s.WebSocketUpgrader = &websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+	}
+
 	h := handlers.CompressHandlerLevel(s.router, gzip.BestCompression)
 	h = handlers.CORS(
 		handlers.AllowedHeaders(allowedHeaders),
@@ -104,6 +114,7 @@ func NewServer() *Server {
 	// Authenticated Routes
 	router.HandleFunc("/get_presigned_url", s.handleGetPresignedBucketURL).Methods("POST")
 	router.HandleFunc("/start_anonymisation", s.handleStartAnonymisation).Methods("POST")
+	router.HandleFunc("/ws-start-deidentification", s.wsStartDeidentification)
 
 	return s
 }

@@ -3,8 +3,10 @@ package http
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -77,28 +79,28 @@ type ErrorResponse struct {
 }
 
 // parseResponseError parses an JSON-formatted error response.
-// func parseResponseError(resp *http.Response) error {
-// 	defer resp.Body.Close()
+func parseResponseError(resp *http.Response) error {
+	defer resp.Body.Close()
 
-// 	// Read the response body so we can reuse it for the error message if it
-// 	// fails to decode as JSON.
-// 	buf, err := ioutil.ReadAll(resp.Body)
-// 	if err != nil {
-// 		return err
-// 	}
+	// Read the response body so we can reuse it for the error message if it
+	// fails to decode as JSON.
+	buf, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
 
-// 	// Parse JSON formatted error response.
-// 	// If not JSON, use the response body as the error message.
-// 	var errorResponse ErrorResponse
-// 	if err := json.Unmarshal(buf, &errorResponse); err != nil {
-// 		message := strings.TrimSpace(string(buf))
-// 		if message == "" {
-// 			message = "Empty response from server."
-// 		}
-// 		return dicomdeidentifier.Errorf(FromErrorStatusCode(resp.StatusCode), message)
-// 	}
-// 	return dicomdeidentifier.Errorf(FromErrorStatusCode(resp.StatusCode), errorResponse.Error)
-// }
+	// Parse JSON formatted error response.
+	// If not JSON, use the response body as the error message.
+	var errorResponse ErrorResponse
+	if err := json.Unmarshal(buf, &errorResponse); err != nil {
+		message := strings.TrimSpace(string(buf))
+		if message == "" {
+			message = "Empty response from server."
+		}
+		return dicomdeidentifier.Errorf(FromErrorStatusCode(resp.StatusCode), message)
+	}
+	return dicomdeidentifier.Errorf(FromErrorStatusCode(resp.StatusCode), errorResponse.Error)
+}
 
 // LogError logs an error with the HTTP route information.
 func LogError(r *http.Request, err error) {

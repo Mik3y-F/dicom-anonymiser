@@ -37,8 +37,6 @@ func (s *Server) handleGetPresignedBucketURL(w http.ResponseWriter, r *http.Requ
 
 // handleStartAnonymisation handles the "POST /start_anonymisation" route.
 func (s *Server) handleStartAnonymisation(w http.ResponseWriter, r *http.Request) {
-	// TODO: GetUploadStatus from frontend
-	// TODO: If successful kickstart export from Bucket to DICOM Store
 	// TODO: Begin anonymisation
 	// TODO: Export Anonymised DICOMS to Bucket
 	// TODO: Send report to client(frontend)
