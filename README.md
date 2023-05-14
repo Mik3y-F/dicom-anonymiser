@@ -40,6 +40,10 @@ To install `dicom-anonymiser`, follow these steps:
 
 3. Run the project:
 
+    ```bash
+    go get -u ./...
+    ```
+
     ```sh
     go run ./cmd/dicomd/main.go
     ```
